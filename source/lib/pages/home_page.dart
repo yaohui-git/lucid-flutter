@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/models.dart';
 import '../core/bridge.dart';
 import '../widgets/pet_avatar.dart';
+import 'intercept_page.dart';
 
 class HomePage extends StatefulWidget {
   final AppState state;

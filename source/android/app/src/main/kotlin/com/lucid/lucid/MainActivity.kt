@@ -19,7 +19,7 @@ class MainActivity : FlutterActivity() {
     companion object {
         private const val METHOD_CHANNEL = "com.lucid.lucid/bridge"
         private const val EVENT_CHANNEL = "com.lucid.lucid/events"
-        private const val PREFS_NAME = "lucid_prefs"
+        const val PREFS_NAME = "lucid_prefs"
         const val KEY_BLOCKED_APPS = "blocked_apps"
 
         @Volatile

@@ -171,7 +171,7 @@ class _PetPainter extends CustomPainter {
     if (level == PetLevel.thriving || level == PetLevel.okay) {
       // 微笑
       canvas.drawPath(
-        Path()..moveTo(cx - 12.0 * s, my).quadraticBezierTo(cx, my + 14.0 * s, cx + 12.0 * s, my),
+        Path()..moveTo(cx - 12.0 * s, my)..quadraticBezierTo(cx, my + 14.0 * s, cx + 12.0 * s, my),
         mouth,
       );
     } else if (level == PetLevel.tired) {
@@ -180,7 +180,7 @@ class _PetPainter extends CustomPainter {
     } else {
       // 难过
       canvas.drawPath(
-        Path()..moveTo(cx - 12.0 * s, my + 6.0 * s).quadraticBezierTo(cx, my - 8.0 * s, cx + 12.0 * s, my + 6.0 * s),
+        Path()..moveTo(cx - 12.0 * s, my + 6.0 * s)..quadraticBezierTo(cx, my - 8.0 * s, cx + 12.0 * s, my + 6.0 * s),
         mouth,
       );
     }

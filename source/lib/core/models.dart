@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 
 /// 宠物状态档位
 enum PetLevel { thriving, okay, tired, sick, critical }
