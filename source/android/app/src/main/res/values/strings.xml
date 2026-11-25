@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">清醒兽</string>
+    <string name="accessibility_description">清醒兽需要此权限来检测你何时打开分心应用（如抖音、小红书），并及时弹出挑战帮你保持清醒。所有数据仅保存在本机。</string>
+    <string name="channel_name">清醒兽守护中</string>
+    <string name="channel_desc">清醒兽正在后台守护你的专注力</string>
+    <string name="notif_title">🧠 清醒兽正在守护你</string>
+</resources>
