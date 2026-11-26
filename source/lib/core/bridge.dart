@@ -49,6 +49,11 @@ class NativeBridge {
     await _channel.invokeMethod('syncBlockedApps', {'packages': packages});
   }
 
+  /// 同步「自动拦截」总开关给原生无障碍服务
+  static Future<void> syncAutoIntercept(bool enabled) async {
+    await _channel.invokeMethod('syncAutoIntercept', {'enabled': enabled});
+  }
+
   /// 获取已安装应用（返回 {name, package} 列表）
   static Future<List<Map<String, String>>> getInstalledApps() async {
     try {

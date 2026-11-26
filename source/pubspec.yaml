@@ -3,7 +3,7 @@ description: "清醒兽 · Lucid — 把少刷手机变成养脑宠物"
 publish_to: 'none'
 
 # 版本号，打包时按需修改
-version: 1.0.0+1
+version: 1.1.0+2
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

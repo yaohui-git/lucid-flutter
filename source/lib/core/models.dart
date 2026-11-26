@@ -187,6 +187,10 @@ class AppState with ChangeNotifier {
   List<DayRecord> history = [];
   List<String> blockedApps = [];
 
+  // 功能开关：主动记录（手动打卡）与自动拦截（无障碍服务）
+  bool manualRecordEnabled = true;
+  bool autoInterceptEnabled = true;
+
   AppState() {
     todayDate = _dateKey(DateTime.now());
   }
@@ -284,6 +288,16 @@ class AppState with ChangeNotifier {
     notifyListeners();
   }
 
+  void setManualRecordEnabled(bool value) {
+    manualRecordEnabled = value;
+    notifyListeners();
+  }
+
+  void setAutoInterceptEnabled(bool value) {
+    autoInterceptEnabled = value;
+    notifyListeners();
+  }
+
   void reset() {
     health = 100;
     lucidPoints = 0;
@@ -298,6 +312,8 @@ class AppState with ChangeNotifier {
     todayMinutes = 0;
     achievements = [];
     history = [];
+    manualRecordEnabled = true;
+    autoInterceptEnabled = true;
     notifyListeners();
   }
 
@@ -316,6 +332,8 @@ class AppState with ChangeNotifier {
         'achievements': achievements,
         'history': history.map((e) => e.toJson()).toList(),
         'blockedApps': blockedApps,
+        'manualRecordEnabled': manualRecordEnabled,
+        'autoInterceptEnabled': autoInterceptEnabled,
       };
 
   void loadFromJson(Map<String, dynamic> j) {
@@ -335,6 +353,8 @@ class AppState with ChangeNotifier {
         .map((e) => DayRecord.fromJson(Map<String, dynamic>.from(e)))
         .toList();
     blockedApps = List<String>.from(j['blockedApps'] ?? defaultBlockedApps);
+    manualRecordEnabled = j['manualRecordEnabled'] ?? true;
+    autoInterceptEnabled = j['autoInterceptEnabled'] ?? true;
     _rollDayIfNeeded();
   }
 

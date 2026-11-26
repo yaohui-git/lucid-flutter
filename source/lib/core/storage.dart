@@ -4,6 +4,7 @@ import 'models.dart';
 /// 本地持久化
 class Storage {
   static const _keyState = 'lucid_state_v1';
+  static const _keyOnboarded = 'lucid_onboarded_v1';
   static final Storage instance = Storage._internal();
   Storage._internal();
 
@@ -31,6 +32,10 @@ class Storage {
   Future<void> saveState(AppState state) async {
     await _prefs?.setString(_keyState, state.toStorageString());
   }
+
+  Future<bool> isOnboarded() async => _prefs?.getBool(_keyOnboarded) ?? false;
+
+  Future<void> setOnboarded() async => await _prefs?.setBool(_keyOnboarded, true);
 
   Future<void> clear() async {
     await _prefs?.remove(_keyState);

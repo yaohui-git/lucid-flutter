@@ -21,6 +21,7 @@ class MainActivity : FlutterActivity() {
         private const val EVENT_CHANNEL = "com.lucid.lucid/events"
         const val PREFS_NAME = "lucid_prefs"
         const val KEY_BLOCKED_APPS = "blocked_apps"
+        const val KEY_AUTO_INTERCEPT = "auto_intercept"
 
         @Volatile
         var eventSink: EventChannel.EventSink? = null
@@ -95,6 +96,11 @@ class MainActivity : FlutterActivity() {
                 @Suppress("UNCHECKED_CAST")
                 val packages = (args as? Map<String, Any>)?.get("packages") as? List<String> ?: emptyList()
                 prefs.edit().putStringSet(KEY_BLOCKED_APPS, packages.toSet()).apply()
+                result.success(true)
+            }
+            "syncAutoIntercept" -> {
+                val enabled = (args as? Map<String, Any>)?.get("enabled") as? Boolean ?: true
+                prefs.edit().putBoolean(KEY_AUTO_INTERCEPT, enabled).apply()
                 result.success(true)
             }
             "getInstalledApps" -> result.success(getInstalledApps())

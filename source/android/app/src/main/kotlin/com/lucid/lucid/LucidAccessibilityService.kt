@@ -19,6 +19,7 @@ class LucidAccessibilityService : AccessibilityService() {
 
     private lateinit var prefs: SharedPreferences
     private var blockedApps: Set<String> = emptySet()
+    private var autoInterceptEnabled = true
     private var lastInterceptTime = 0L
     private var lastPackage = ""
     private var lastEventTime = 0L
@@ -46,6 +47,7 @@ class LucidAccessibilityService : AccessibilityService() {
 
     private fun refreshBlockedApps() {
         blockedApps = prefs.getStringSet(MainActivity.KEY_BLOCKED_APPS, emptySet()) ?: emptySet()
+        autoInterceptEnabled = prefs.getBoolean(MainActivity.KEY_AUTO_INTERCEPT, true)
     }
 
     private fun startForegroundNotification() {
@@ -106,6 +108,8 @@ class LucidAccessibilityService : AccessibilityService() {
         if (pkg == packageName) return
 
         refreshBlockedApps()
+        // 用户可在 App 内关闭「自动拦截」总开关，关闭后服务不弹出挑战
+        if (!autoInterceptEnabled) return
         if (!blockedApps.contains(pkg)) return
 
         // 冷却期

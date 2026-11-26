@@ -9,6 +9,7 @@ import 'pages/evolution_page.dart';
 import 'pages/stats_page.dart';
 import 'pages/settings_page.dart';
 import 'pages/intercept_page.dart';
+import 'pages/onboarding_page.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,6 +32,7 @@ class LucidApp extends StatefulWidget {
 class _LucidAppState extends State<LucidApp> {
   final AppState state = AppState();
   bool _ready = false;
+  bool _onboarded = false;
 
   @override
   void initState() {
@@ -40,10 +42,12 @@ class _LucidAppState extends State<LucidApp> {
 
   Future<void> _boot() async {
     await Storage.instance.init();
+    _onboarded = await Storage.instance.isOnboarded();
     final loaded = await Storage.instance.loadState();
     state.loadFromJson(loaded.toJson());
-    // 同步拦截名单给原生
+    // 同步拦截名单与开关给原生
     await NativeBridge.syncBlockedApps(state.blockedApps);
+    await NativeBridge.syncAutoIntercept(state.autoInterceptEnabled);
     // 监听原生拦截事件
     NativeBridge.listenIntercept((package, name) {
       if (!mounted) return;
@@ -108,7 +112,17 @@ class _LucidAppState extends State<LucidApp> {
         ),
         useMaterial3: true,
       ),
-      home: MainShell(state: state, onPersist: _persist),
+      home: _onboarded
+          ? MainShell(state: state, onPersist: _persist)
+          : OnboardingPage(
+              state: state,
+              onDone: () async {
+                await Storage.instance.saveState(state);
+                await Storage.instance.setOnboarded();
+                if (!mounted) return;
+                setState(() => _onboarded = true);
+              },
+            ),
     );
   }
 }

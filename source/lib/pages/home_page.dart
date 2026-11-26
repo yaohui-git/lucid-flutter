@@ -88,10 +88,12 @@ class _HomePageState extends State<HomePage> {
                             ),
                         ],
                       ),
-                      const SizedBox(height: 20),
-                      _sectionTitle('记录你的行为'),
-                      const SizedBox(height: 10),
-                      _actionGrid(),
+                      if (s.manualRecordEnabled) ...[
+                        const SizedBox(height: 20),
+                        _sectionTitle('记录你的行为'),
+                        const SizedBox(height: 10),
+                        _actionGrid(),
+                      ],
                       const SizedBox(height: 20),
                       _interceptDemo(),
                       const SizedBox(height: 20),
@@ -335,6 +337,27 @@ class _HomePageState extends State<HomePage> {
       );
 
   Widget _permBanner() {
+    // 自动拦截总开关关闭时，直接显示暂停状态，不查权限
+    if (!s.autoInterceptEnabled) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: const Color(0xFF6C6C8A).withOpacity(0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFF6C6C8A).withOpacity(0.3)),
+        ),
+        child: Row(
+          children: const [
+            Text('⏸️', style: TextStyle(fontSize: 18)),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text('自动拦截已暂停，可在「设置」中开启',
+                  style: TextStyle(fontSize: 11, color: Color(0xFF9A9AB0))),
+            ),
+          ],
+        ),
+      );
+    }
     return FutureBuilder<bool>(
       future: NativeBridge.isAccessibilityEnabled(),
       builder: (context, snap) {

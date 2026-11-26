@@ -35,6 +35,30 @@ class _SettingsPageState extends State<SettingsPage> {
     });
   }
 
+  void _persist() => Storage.instance.saveState(s);
+
+  Future<void> _checkPermissionsHint() async {
+    final usage = await NativeBridge.hasUsageAccess();
+    final acc = await NativeBridge.isAccessibilityEnabled();
+    if (usage && acc) return;
+    if (!mounted) return;
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E38),
+        title: const Text('需要开启权限', style: TextStyle(fontSize: 16)),
+        content: Text(
+          '自动拦截需要下面${!acc ? '「无障碍服务」' : ''}${!usage && !acc ? '和' : ''}${!usage ? '「使用情况访问权」' : ''}。'
+          '\n\n请在下方「自动拦截所需权限」里点开对应项目，按提示在系统设置中开启后返回。',
+          style: const TextStyle(fontSize: 12, color: Color(0xFFC8C8DC), height: 1.6),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('知道了')),
+        ],
+      ),
+    );
+  }
+
   void _toggleBlock(String pkg) {
     final list = List<String>.from(s.blockedApps);
     if (list.contains(pkg)) {
@@ -58,7 +82,32 @@ class _SettingsPageState extends State<SettingsPage> {
             children: [
               const Text('⚙️ 设置', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
               const SizedBox(height: 20),
-              _section('必需权限', [
+              _section('功能模式（自己选）', [
+                _switchTile(
+                  icon: '✍️',
+                  title: '主动记录',
+                  desc: '在首页手动打卡：刷了一会儿 / 专注完成 / 深呼吸。无需任何权限',
+                  value: s.manualRecordEnabled,
+                  onChanged: (v) {
+                    s.setManualRecordEnabled(v);
+                    _persist();
+                  },
+                ),
+                _switchTile(
+                  icon: '🛡️',
+                  title: '自动拦截',
+                  desc: '打开目标 APP 时自动弹出挑战。需要开启下方两项权限',
+                  value: s.autoInterceptEnabled,
+                  onChanged: (v) {
+                    s.setAutoInterceptEnabled(v);
+                    NativeBridge.syncAutoIntercept(v);
+                    _persist();
+                    if (v) _checkPermissionsHint();
+                  },
+                ),
+              ]),
+              const SizedBox(height: 20),
+              _section('自动拦截所需权限', [
                 _permTile(
                   icon: '📊',
                   title: '使用情况访问权',
@@ -180,6 +229,41 @@ class _SettingsPageState extends State<SettingsPage> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _switchTile({
+    required String icon,
+    required String title,
+    required String desc,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      child: Row(
+        children: [
+          Text(icon, style: const TextStyle(fontSize: 22)),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 2),
+                Text(desc, style: const TextStyle(fontSize: 10, color: Color(0xFFA8A8C4), height: 1.4)),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Switch(
+            value: value,
+            onChanged: onChanged,
+            activeColor: const Color(0xFF6C5CE7),
+            inactiveThumbColor: const Color(0xFF6C6C8A),
+          ),
+        ],
       ),
     );
   }
