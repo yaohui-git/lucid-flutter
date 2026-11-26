@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../core/models.dart';
 import '../core/bridge.dart';
 import '../core/storage.dart';
+import 'diagnostic_page.dart';
 
 class SettingsPage extends StatefulWidget {
   final AppState state;
@@ -81,6 +82,38 @@ class _SettingsPageState extends State<SettingsPage> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Text('⚙️ 设置', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const DiagnosticPage()),
+                ),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF6C5CE7).withOpacity(0.14),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFF6C5CE7).withOpacity(0.45)),
+                  ),
+                  child: Row(
+                    children: const [
+                      Text('🔍', style: TextStyle(fontSize: 22)),
+                      SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('拦截诊断', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                            SizedBox(height: 2),
+                            Text('打开目标App没弹窗？进来看看卡在哪一步', style: TextStyle(fontSize: 10, color: Color(0xFFA8A8C4))),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.arrow_forward_ios, size: 16, color: Color(0xFFA29BFE)),
+                    ],
+                  ),
+                ),
+              ),
               const SizedBox(height: 20),
               _section('功能模式（自己选）', [
                 _switchTile(

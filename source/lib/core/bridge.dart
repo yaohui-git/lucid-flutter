@@ -78,6 +78,32 @@ class NativeBridge {
     }
   }
 
+  /// 读取原生全链路诊断日志
+  static Future<String> getDiagLog() async {
+    try {
+      final r = await _channel.invokeMethod<String>('getDiagLog');
+      return r ?? '';
+    } on PlatformException {
+      return '';
+    }
+  }
+
+  /// 清空原生诊断日志
+  static Future<void> clearDiagLog() async {
+    await _channel.invokeMethod('clearDiagLog');
+  }
+
+  /// 读取当前链路快照（权限、开关、名单、通道状态）
+  static Future<Map<String, dynamic>> diagSnapshot() async {
+    try {
+      final r = await _channel.invokeMethod<Map<dynamic, dynamic>>('diagSnapshot');
+      if (r == null) return {};
+      return r.map((k, v) => MapEntry<String, dynamic>(k.toString(), v));
+    } on PlatformException {
+      return {};
+    }
+  }
+
   /// 监听「用户打开了目标 APP」事件
   /// [onIntercept] 收到 {package, name}
   static void listenIntercept(void Function(String package, String name) onIntercept) {

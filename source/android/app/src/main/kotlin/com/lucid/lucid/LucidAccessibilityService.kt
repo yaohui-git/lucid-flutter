@@ -20,74 +20,98 @@ class LucidAccessibilityService : AccessibilityService() {
     private var lastPackage = ""
     private var lastEventTime = 0L
 
-    companion object {
-        private const val COOL_DOWN_MS = 60_000L // 同一 APP 冷却 60 秒，避免频繁打扰
-    }
-
     override fun onServiceConnected() {
         super.onServiceConnected()
         prefs = getSharedPreferences(MainActivity.PREFS_NAME, Context.MODE_PRIVATE)
         refreshBlockedApps()
-
-        val info = AccessibilityServiceInfo().apply {
-            eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
-            feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
-            notificationTimeout = 100
-        }
-        serviceInfo = info
-        // 注意：无障碍服务由系统保活，无需 startForeground()。
-        // targetSdk>=34 时调用 startForeground() 必须声明 foregroundServiceType，
-        // 否则抛 MissingForegroundServiceTypeException 导致服务崩溃（表现为「此服务出现故障」）。
+        MainActivity.addDiag(this, "Service", "onServiceConnected 服务已连接, 名单=${blockedApps.size}个, 开关=$autoInterceptEnabled")
+        // 重要：不再用 new AccessibilityServiceInfo() 覆盖系统配置。
+        // 之前那样做会把 flags/canRetrieveWindowContent 等清成默认值，部分机型会因此收不到事件或行为异常。
+        // 事件类型、feedbackType、notificationTimeout 全部由 res/xml/accessibility_service_config.xml 声明。
+        // 另外：无障碍服务由系统保活，无需 startForeground()（新版 Android 上会崩）。
     }
 
     private fun refreshBlockedApps() {
-        blockedApps = prefs.getStringSet(MainActivity.KEY_BLOCKED_APPS, emptySet()) ?: emptySet()
+        val stored = prefs.getStringSet(MainActivity.KEY_BLOCKED_APPS, emptySet()) ?: emptySet()
+        // 名单为空时用默认名单兜底，避免同步未完成/被清空导致永不拦截
+        blockedApps = if (stored.isEmpty()) DEFAULT_BLOCKED else stored
         autoInterceptEnabled = prefs.getBoolean(MainActivity.KEY_AUTO_INTERCEPT, true)
     }
 
+    companion object {
+        private const val COOL_DOWN_MS = 60_000L // 同一 APP 冷却 60 秒，避免频繁打扰
+        private val DEFAULT_BLOCKED = setOf(
+            "com.ss.android.ugc.aweme", // 抖音
+            "com.kuaishou.nebula", // 快手
+            "com.xingin.xhs", // 小红书
+            "com.tencent.mm", // 微信
+            "com.sina.weibo", // 微博
+            "tv.danmaku.bili", // B站
+        )
+    }
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
-        val pkg = event.packageName?.toString() ?: return
-        if (pkg.isEmpty()) return
+        try {
+            if (event?.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+            val pkg = event.packageName?.toString() ?: return
+            if (pkg.isEmpty()) return
 
-        val now = System.currentTimeMillis()
+            val now = System.currentTimeMillis()
 
-        // 去重：同一包名在极短时间内重复事件忽略
-        if (pkg == lastPackage && now - lastEventTime < 800) return
-        lastPackage = pkg
-        lastEventTime = now
+            // 去重：同一包名在极短时间内重复事件忽略
+            if (pkg == lastPackage && now - lastEventTime < 800) return
+            lastPackage = pkg
+            lastEventTime = now
 
-        // 忽略本应用自身
-        if (pkg == packageName) return
+            // 忽略本应用自身
+            if (pkg == packageName) return
 
-        refreshBlockedApps()
-        // 用户可在 App 内关闭「自动拦截」总开关，关闭后服务不弹出挑战
-        if (!autoInterceptEnabled) return
-        if (!blockedApps.contains(pkg)) return
+            refreshBlockedApps()
+            MainActivity.addDiag(this, "Event", "窗口切换到 $pkg (名单${blockedApps.size}个/开关$autoInterceptEnabled)")
 
-        // 冷却期
-        if (now - lastInterceptTime < COOL_DOWN_MS) return
-        lastInterceptTime = now
+            // 用户可在 App 内关闭「自动拦截」总开关，关闭后服务不弹出挑战
+            if (!autoInterceptEnabled) {
+                MainActivity.addDiag(this, "Event", "跳过:自动拦截开关=关")
+                return
+            }
+            if (!blockedApps.contains(pkg)) {
+                MainActivity.addDiag(this, "Event", "跳过:$pkg 不在名单")
+                return
+            }
 
-        val appName = try {
-            packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
+            // 冷却期
+            if (now - lastInterceptTime < COOL_DOWN_MS) {
+                MainActivity.addDiag(this, "Event", "跳过:$pkg 冷却期内(剩余${(COOL_DOWN_MS - (now - lastInterceptTime)) / 1000}s)")
+                return
+            }
+            lastInterceptTime = now
+
+            val appName = try {
+                packageManager.getApplicationLabel(packageManager.getApplicationInfo(pkg, 0)).toString()
+            } catch (e: Exception) {
+                pkg
+            }
+
+            MainActivity.addDiag(this, "Hit", "★命中目标 $appName($pkg), 准备拉起App")
+            val payload = mapOf("package" to pkg, "name" to appName)
+            // 关键：必须无条件把清醒兽拉到前台，拦截页才能盖在目标 App 上面。
+            val launch = Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                        Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                        Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+                putExtra("intercept_package", pkg)
+                putExtra("intercept_name", appName)
+            }
+            MainActivity.pendingIntercept = payload
+            try {
+                startActivity(launch)
+                MainActivity.addDiag(this, "Hit", "startActivity已调用 pkg=$pkg")
+            } catch (e: Exception) {
+                MainActivity.addDiag(this, "Hit", "startActivity失败: ${e.message}")
+            }
         } catch (e: Exception) {
-            pkg
+            MainActivity.addDiag(this, "Event", "onAccessibilityEvent异常: ${e.message}")
         }
-
-        val payload = mapOf("package" to pkg, "name" to appName)
-        // 关键：必须无条件把清醒兽拉到前台，拦截页才能盖在目标 App 上面。
-        // 旧逻辑只在 Flutter 通道未就绪时才拉起，导致 App 在后台时拦截页弹在后台，用户看不到。
-        val launch = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
-                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
-                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
-            putExtra("intercept_package", pkg)
-            putExtra("intercept_name", appName)
-        }
-        // 先把事件存好，Activity 拉起后由它决定立即发送还是等 Flutter 连上再发
-        MainActivity.pendingIntercept = payload
-        startActivity(launch)
     }
 
     override fun onInterrupt() {}

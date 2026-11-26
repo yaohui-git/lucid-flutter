@@ -34,10 +34,27 @@ class _LucidAppState extends State<LucidApp> {
   bool _ready = false;
   bool _onboarded = false;
 
+  // 冷启动时事件可能早于界面就绪到达，先缓存，等 ready 后再弹，避免弹窗丢失
+  Map<String, String>? _pendingIntercept;
+
   @override
   void initState() {
     super.initState();
     _boot();
+  }
+
+  /// 消费缓存的拦截事件（界面就绪后调用）
+  void _flushPendingIntercept() {
+    if (!_ready) return;
+    final p = _pendingIntercept;
+    if (p == null || !mounted) return;
+    _pendingIntercept = null;
+    // 等这一帧 build 完成后再弹，确保 context 挂载稳定
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        showInterceptSheet(context, state, p['package'] ?? '', p['name'] ?? '未知应用');
+      }
+    });
   }
 
   Future<void> _boot() async {
@@ -51,11 +68,18 @@ class _LucidAppState extends State<LucidApp> {
     // 监听原生拦截事件
     NativeBridge.listenIntercept((package, name) {
       if (!mounted) return;
-      showInterceptSheet(context, state, package, name);
+      if (_ready) {
+        showInterceptSheet(context, state, package, name);
+      } else {
+        // 界面还没就绪（冷启动被无障碍服务拉起），先缓存
+        _pendingIntercept = {'package': package, 'name': name};
+      }
     });
     // 定时读取屏幕使用时长
     _startUsagePolling();
     setState(() => _ready = true);
+    // 界面已就绪，弹出此前缓存的拦截事件
+    _flushPendingIntercept();
   }
 
   Timer? _pollTimer;

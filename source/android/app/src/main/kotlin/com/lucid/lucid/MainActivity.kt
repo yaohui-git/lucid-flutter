@@ -13,6 +13,9 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : FlutterActivity() {
 
@@ -22,12 +25,37 @@ class MainActivity : FlutterActivity() {
         const val PREFS_NAME = "lucid_prefs"
         const val KEY_BLOCKED_APPS = "blocked_apps"
         const val KEY_AUTO_INTERCEPT = "auto_intercept"
+        private const val KEY_DIAG_LOG = "diag_log"
+        private const val MAX_DIAG_LINES = 120
 
         @Volatile
         var eventSink: EventChannel.EventSink? = null
 
         @Volatile
         var pendingIntercept: Map<String, String>? = null
+
+        /** 追加一条诊断日志（环形缓冲，保留最近 [MAX_DIAG_LINES] 行） */
+        @Synchronized
+        fun addDiag(context: Context, tag: String, msg: String) {
+            try {
+                val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+                val old = prefs.getString(KEY_DIAG_LOG, "") ?: ""
+                val ts = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
+                val line = "[$ts][$tag] $msg"
+                val lines = (old + "\n" + line).split("\n").filter { it.isNotBlank() }
+                val kept = lines.takeLast(MAX_DIAG_LINES).joinToString("\n")
+                prefs.edit().putString(KEY_DIAG_LOG, kept).apply()
+            } catch (_: Exception) { }
+        }
+
+        fun getDiag(context: Context): String =
+            try { context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_DIAG_LOG, "") ?: "" }
+            catch (_: Exception) { "" }
+
+        fun clearDiag(context: Context) {
+            try { context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).edit().putString(KEY_DIAG_LOG, "").apply() }
+            catch (_: Exception) { }
+        }
     }
 
     private lateinit var prefs: SharedPreferences
@@ -48,15 +76,23 @@ class MainActivity : FlutterActivity() {
         val pkg = intent?.getStringExtra("intercept_package") ?: return
         val name = intent.getStringExtra("intercept_name") ?: pkg
         val payload = mapOf("package" to pkg, "name" to name)
+        addDiag(this, "Activity", "收到拦截intent pkg=$pkg name=$name sinkReady=${eventSink != null}")
         // 清除 extra，避免旋转屏幕时重复触发
         intent.removeExtra("intercept_package")
         intent.removeExtra("intercept_name")
         // Flutter 通道已就绪就直接弹；否则存起来，等 EventChannel.onListen 时再发
         eventSink?.let { sink ->
-            sink.success(payload)
-            pendingIntercept = null
+            try {
+                sink.success(payload)
+                pendingIntercept = null
+                addDiag(this, "Activity", "事件已send到Flutter pkg=$pkg")
+            } catch (e: Exception) {
+                pendingIntercept = payload
+                addDiag(this, "Activity", "send异常已转pending: ${e.message}")
+            }
         } ?: run {
             pendingIntercept = payload
+            addDiag(this, "Activity", "Flutter未连上,存pending pkg=$pkg")
         }
     }
 
@@ -75,9 +111,21 @@ class MainActivity : FlutterActivity() {
         ).setStreamHandler(object : EventChannel.StreamHandler {
             override fun onListen(arguments: Any?, events: EventChannel.EventSink) {
                 eventSink = events
-                pendingIntercept?.let { events.success(it); pendingIntercept = null }
+                addDiag(this@MainActivity, "Channel", "EventChannel已连接(onListen), pending=${pendingIntercept != null}")
+                pendingIntercept?.let {
+                    try {
+                        events.success(it)
+                        addDiag(this@MainActivity, "Channel", "补发pending事件 pkg=${it["package"]}")
+                    } catch (e: Exception) {
+                        addDiag(this@MainActivity, "Channel", "补发pending异常: ${e.message}")
+                    }
+                    pendingIntercept = null
+                }
             }
-            override fun onCancel(arguments: Any?) { eventSink = null }
+            override fun onCancel(arguments: Any?) {
+                eventSink = null
+                addDiag(this@MainActivity, "Channel", "EventChannel断开(onCancel)")
+            }
         })
     }
 
@@ -113,6 +161,16 @@ class MainActivity : FlutterActivity() {
             }
             "getInstalledApps" -> result.success(getInstalledApps())
             "todayUsageMinutes" -> result.success(todayUsageMinutes())
+            "getDiagLog" -> result.success(getDiag(this))
+            "clearDiagLog" -> { clearDiag(this); result.success(true) }
+            "diagSnapshot" -> result.success(mapOf(
+                "accessibilityEnabled" to isAccessibilityEnabled(),
+                "usageAccess" to hasUsageAccess(),
+                "autoIntercept" to (prefs.getBoolean(KEY_AUTO_INTERCEPT, true)),
+                "blockedApps" to (prefs.getStringSet(KEY_BLOCKED_APPS, emptySet())?.toList() ?: emptyList<String>()),
+                "eventSinkReady" to (eventSink != null),
+                "pendingIntercept" to (pendingIntercept?.get("package") ?: "")
+            ))
             else -> result.notImplemented()
         }
     }
