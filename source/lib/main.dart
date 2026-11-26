@@ -146,7 +146,7 @@ class _MainShellState extends State<MainShell> {
     super.initState();
     widget.state.addListener(_onStateChanged);
     _pages.addAll([
-      HomePage(state: widget.state),
+      HomePage(state: widget.state, onGoSettings: () => setState(() => _index = 3)),
       EvolutionPage(state: widget.state),
       StatsPage(state: widget.state),
       SettingsPage(state: widget.state),

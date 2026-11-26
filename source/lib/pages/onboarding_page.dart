@@ -119,7 +119,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
             emoji: '🛡️',
             title: '自动拦截',
             tag: '需系统权限',
-            desc: '打开抖音/小红书等目标 App 时自动弹出挑战拦你一下。需要开启无障碍服务和使用情况访问权。',
+            desc: '打开抖音/小红书等目标 App 的那一刻，弹出一个小挑战（深呼吸/点10下/记数字），完成就放行。需要无障碍服务和使用统计权限。',
             value: _auto,
             accent: const Color(0xFFFF7675),
             onChanged: (v) => setState(() => _auto = v),

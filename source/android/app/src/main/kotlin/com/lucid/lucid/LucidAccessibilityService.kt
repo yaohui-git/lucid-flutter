@@ -76,20 +76,18 @@ class LucidAccessibilityService : AccessibilityService() {
         }
 
         val payload = mapOf("package" to pkg, "name" to appName)
-        val sink = MainActivity.eventSink
-        if (sink != null) {
-            sink.success(payload)
-        } else {
-            // Flutter 页面未就绪，先存起来，等建立连接后发送
-            MainActivity.pendingIntercept = payload
-            // 拉起应用以便展示拦截页
-            val launch = Intent(this, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                putExtra("intercept_package", pkg)
-                putExtra("intercept_name", appName)
-            }
-            startActivity(launch)
+        // 关键：必须无条件把清醒兽拉到前台，拦截页才能盖在目标 App 上面。
+        // 旧逻辑只在 Flutter 通道未就绪时才拉起，导致 App 在后台时拦截页弹在后台，用户看不到。
+        val launch = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or
+                    Intent.FLAG_ACTIVITY_SINGLE_TOP or
+                    Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
+            putExtra("intercept_package", pkg)
+            putExtra("intercept_name", appName)
         }
+        // 先把事件存好，Activity 拉起后由它决定立即发送还是等 Flutter 连上再发
+        MainActivity.pendingIntercept = payload
+        startActivity(launch)
     }
 
     override fun onInterrupt() {}

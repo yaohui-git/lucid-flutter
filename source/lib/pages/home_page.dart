@@ -7,7 +7,8 @@ import 'intercept_page.dart';
 
 class HomePage extends StatefulWidget {
   final AppState state;
-  const HomePage({super.key, required this.state});
+  final VoidCallback onGoSettings;
+  const HomePage({super.key, required this.state, required this.onGoSettings});
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -88,6 +89,8 @@ class _HomePageState extends State<HomePage> {
                             ),
                         ],
                       ),
+                      const SizedBox(height: 20),
+                      _guardCard(),
                       if (s.manualRecordEnabled) ...[
                         const SizedBox(height: 20),
                         _sectionTitle('记录你的行为'),
@@ -95,11 +98,7 @@ class _HomePageState extends State<HomePage> {
                         _actionGrid(),
                       ],
                       const SizedBox(height: 20),
-                      _interceptDemo(),
-                      const SizedBox(height: 20),
                       _todayStats(),
-                      const SizedBox(height: 16),
-                      _permBanner(),
                     ],
                   ),
                 ),
@@ -265,45 +264,158 @@ class _HomePageState extends State<HomePage> {
     );
   }
 
-  Widget _interceptDemo() {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(14),
-        gradient: LinearGradient(
-          colors: [
-            const Color(0xFFFF7675).withOpacity(0.1),
-            const Color(0xFF6C5CE7).withOpacity(0.1),
+  Widget _guardCard() {
+    return FutureBuilder<List<bool>>(
+      future: Future.wait([
+        NativeBridge.hasUsageAccess(),
+        NativeBridge.isAccessibilityEnabled(),
+      ]),
+      builder: (context, snap) {
+        final usage = snap.data?[0] ?? false;
+        final access = snap.data?[1] ?? false;
+        final targetCount = s.blockedApps.length;
+        final on = s.autoInterceptEnabled;
+        // 状态：关闭 / 开启但权限未全 / 正常运行
+        final statusText = !on
+            ? '已暂停'
+            : (access && usage)
+                ? '守护中'
+                : '待设置权限';
+        final statusColor = !on
+            ? const Color(0xFF9A9AB0)
+            : (access && usage)
+                ? const Color(0xFF00B894)
+                : const Color(0xFFFDCB6E);
+        final statusIcon = !on ? '⏸️' : (access && usage) ? '🟢' : '⚠️';
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF1E1E38), Color(0xFF242442)],
+            ),
+            border: Border.all(color: statusColor.withOpacity(0.5), width: 1.5),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                children: [
+                  const Text('🛡️', style: TextStyle(fontSize: 22)),
+                  const SizedBox(width: 10),
+                  const Text('自动拦截', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.15),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text('$statusIcon $statusText',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: statusColor)),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              // 通俗说明
+              const Text(
+                '开启后，每当你点开小红书等目标 App，会立刻弹出一个小挑战拦你一下，'
+                '完成就放行。不是按时间强制，只是打断下意识点开。',
+                style: TextStyle(fontSize: 11, color: Color(0xFFA8A8C4), height: 1.6),
+              ),
+              const SizedBox(height: 12),
+              // 三项状态
+              Row(
+                children: [
+                  _guardChip('无障碍', access),
+                  const SizedBox(width: 8),
+                  _guardChip('使用统计', usage),
+                  const SizedBox(width: 8),
+                  _guardChip('监控 $targetCount 个 App', targetCount > 0),
+                ],
+              ),
+              if (!on || !access || !usage) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFDCB6E).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    !on
+                        ? '自动拦截已关闭，到「设置」打开开关即可启用。'
+                        : '权限未齐全，到「设置」按提示开启无障碍和使用统计。',
+                    style: const TextStyle(fontSize: 10, color: Color(0xFFFDCB6E), height: 1.5),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => showInterceptSheet(context, s, 'demo', '短视频'),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFF7675).withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFFFF7675).withOpacity(0.5)),
+                        ),
+                        child: const Center(
+                          child: Text('▶️ 测试拦截效果',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFFF7675))),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: widget.onGoSettings,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(vertical: 11),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF6C5CE7).withOpacity(0.15),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF6C5CE7).withOpacity(0.5)),
+                        ),
+                        child: const Center(
+                          child: Text('⚙️ 去设置',
+                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFA29BFE))),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _guardChip(String label, bool ok) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 7),
+        decoration: BoxDecoration(
+          color: ok ? const Color(0xFF00B894).withOpacity(0.1) : const Color(0xFF6C6C8A).withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(ok ? Icons.check_circle : Icons.radio_button_unchecked,
+                size: 12, color: ok ? const Color(0xFF00B894) : const Color(0xFF6C6C8A)),
+            const SizedBox(width: 4),
+            Text(label,
+                style: TextStyle(fontSize: 10, color: ok ? const Color(0xFF00B894) : const Color(0xFF9A9AB0))),
           ],
         ),
-        border: Border.all(color: const Color(0xFFFF7675).withOpacity(0.3)),
-      ),
-      child: Row(
-        children: [
-          const Text('🛡️', style: TextStyle(fontSize: 26)),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text('冲动拦截已就绪', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                SizedBox(height: 2),
-                Text('开启无障碍服务后，打开目标 APP 会自动弹出挑战', style: TextStyle(fontSize: 10, color: Color(0xFFA8A8C4))),
-              ],
-            ),
-          ),
-          GestureDetector(
-            onTap: () => showInterceptSheet(context, s, 'demo', '短视频'),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFF7675),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Text('测试', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.white)),
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -336,58 +448,4 @@ class _HomePageState extends State<HomePage> {
         ],
       );
 
-  Widget _permBanner() {
-    // 自动拦截总开关关闭时，直接显示暂停状态，不查权限
-    if (!s.autoInterceptEnabled) {
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        decoration: BoxDecoration(
-          color: const Color(0xFF6C6C8A).withOpacity(0.08),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: const Color(0xFF6C6C8A).withOpacity(0.3)),
-        ),
-        child: Row(
-          children: const [
-            Text('⏸️', style: TextStyle(fontSize: 18)),
-            SizedBox(width: 10),
-            Expanded(
-              child: Text('自动拦截已暂停，可在「设置」中开启',
-                  style: TextStyle(fontSize: 11, color: Color(0xFF9A9AB0))),
-            ),
-          ],
-        ),
-      );
-    }
-    return FutureBuilder<bool>(
-      future: NativeBridge.isAccessibilityEnabled(),
-      builder: (context, snap) {
-        final on = snap.data == true;
-        return Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-          decoration: BoxDecoration(
-            color: on ? const Color(0xFF00B894).withOpacity(0.08) : const Color(0xFFFDCB6E).withOpacity(0.08),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: on ? const Color(0xFF00B894).withOpacity(0.4) : const Color(0xFFFDCB6E).withOpacity(0.4)),
-          ),
-          child: Row(
-            children: [
-              Text(on ? '✅' : '⚠️', style: const TextStyle(fontSize: 18)),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  on ? '拦截服务运行中，正在守护你的专注' : '拦截服务未开启，点此去设置',
-                  style: TextStyle(fontSize: 11, color: on ? const Color(0xFF00B894) : const Color(0xFFFDCB6E)),
-                ),
-              ),
-              if (!on)
-                GestureDetector(
-                  onTap: () => NativeBridge.openAccessibilitySettings(),
-                  child: const Icon(Icons.arrow_forward_ios, size: 16, color: Color(0xFFFDCB6E)),
-                ),
-            ],
-          ),
-        );
-      },
-    );
-  }
 }

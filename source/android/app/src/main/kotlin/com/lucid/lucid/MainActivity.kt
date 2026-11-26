@@ -43,13 +43,21 @@ class MainActivity : FlutterActivity() {
         handleInterceptIntent(intent)
     }
 
-    /** 处理从无障碍服务冷启动拉起时携带的拦截信息 */
+    /** 处理从无障碍服务拉起时携带的拦截信息（冷启动 onNewIntent 都会走这里） */
     private fun handleInterceptIntent(intent: Intent?) {
         val pkg = intent?.getStringExtra("intercept_package") ?: return
         val name = intent.getStringExtra("intercept_name") ?: pkg
-        pendingIntercept = mapOf("package" to pkg, "name" to name)
+        val payload = mapOf("package" to pkg, "name" to name)
         // 清除 extra，避免旋转屏幕时重复触发
         intent.removeExtra("intercept_package")
+        intent.removeExtra("intercept_name")
+        // Flutter 通道已就绪就直接弹；否则存起来，等 EventChannel.onListen 时再发
+        eventSink?.let { sink ->
+            sink.success(payload)
+            pendingIntercept = null
+        } ?: run {
+            pendingIntercept = payload
+        }
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {

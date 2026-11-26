@@ -133,7 +133,20 @@ class _InterceptPageState extends State<InterceptPage> with SingleTickerProvider
                   textAlign: TextAlign.center,
                   style: const TextStyle(fontSize: 13, color: Color(0xFFA8A8C4), height: 1.6),
                 ),
-                const SizedBox(height: 24),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF00B894).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: const Text(
+                    '💡 完成后立即放行，你还是可以正常刷；也可以选择放弃',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 10, color: Color(0xFF00B894), height: 1.4),
+                  ),
+                ),
+                const SizedBox(height: 16),
                 Expanded(child: _buildChallenge()),
                 const SizedBox(height: 12),
                 SizedBox(
