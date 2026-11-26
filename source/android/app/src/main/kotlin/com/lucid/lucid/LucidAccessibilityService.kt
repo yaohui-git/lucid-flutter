@@ -2,13 +2,9 @@ package com.lucid.lucid
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
-import android.os.Build
 import android.view.accessibility.AccessibilityEvent
 
 /**
@@ -25,8 +21,6 @@ class LucidAccessibilityService : AccessibilityService() {
     private var lastEventTime = 0L
 
     companion object {
-        private const val CHANNEL_ID = "lucid_guard"
-        private const val NOTIF_ID = 1001
         private const val COOL_DOWN_MS = 60_000L // 同一 APP 冷却 60 秒，避免频繁打扰
     }
 
@@ -41,55 +35,14 @@ class LucidAccessibilityService : AccessibilityService() {
             notificationTimeout = 100
         }
         serviceInfo = info
-
-        startForegroundNotification()
+        // 注意：无障碍服务由系统保活，无需 startForeground()。
+        // targetSdk>=34 时调用 startForeground() 必须声明 foregroundServiceType，
+        // 否则抛 MissingForegroundServiceTypeException 导致服务崩溃（表现为「此服务出现故障」）。
     }
 
     private fun refreshBlockedApps() {
         blockedApps = prefs.getStringSet(MainActivity.KEY_BLOCKED_APPS, emptySet()) ?: emptySet()
         autoInterceptEnabled = prefs.getBoolean(MainActivity.KEY_AUTO_INTERCEPT, true)
-    }
-
-    private fun startForegroundNotification() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                getString(R.string.channel_name),
-                NotificationManager.IMPORTANCE_LOW
-            ).apply { description = getString(R.string.channel_desc) }
-            val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            nm.createNotificationChannel(channel)
-        }
-
-        val intent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK
-        }
-        val pi = PendingIntent.getActivity(
-            this, 0, intent,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-            else PendingIntent.FLAG_UPDATE_CURRENT
-        )
-
-        val notification = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            android.app.Notification.Builder(this, CHANNEL_ID)
-                .setContentTitle(getString(R.string.notif_title))
-                .setContentText("检测到分心时会自动提醒你")
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
-                .setContentIntent(pi)
-                .setOngoing(true)
-                .build()
-        } else {
-            @Suppress("DEPRECATION")
-            android.app.Notification.Builder(this)
-                .setContentTitle(getString(R.string.notif_title))
-                .setContentText("检测到分心时会自动提醒你")
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
-                .setContentIntent(pi)
-                .setOngoing(true)
-                .build()
-        }
-        startForeground(NOTIF_ID, notification)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
